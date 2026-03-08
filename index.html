@@ -1,12 +1,205 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Placeholder Index</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teachable Machine - Gundam Detector</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        #webcam-container {
+            margin: 20px auto;
+            position: relative;
+        }
+
+        canvas {
+            border-radius: 8px;
+            transition: border 0.3s ease;
+        }
+
+        canvas.gundam-detected {
+            border: 5px solid red;
+            box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+        }
+
+        #alert-box {
+            display: none;
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #ffcccc;
+            border: 3px solid red;
+            border-radius: 8px;
+            color: red;
+            font-weight: bold;
+            font-size: 18px;
+            animation: pulse 0.5s;
+        }
+
+        #alert-box.show {
+            display: block;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(0.95);
+                opacity: 0.8;
+            }
+            50% {
+                transform: scale(1.05);
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        #label-container {
+            margin-top: 30px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .label-item {
+            padding: 10px;
+            margin: 5px 0;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+        }
+
+        .gundam {
+            color: #d32f2f;
+        }
+
+        .not-gundam {
+            color: #388e3c;
+        }
+
+        button {
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #0b7dda;
+        }
+
+        button:active {
+            background-color: #0056b3;
+        }
+
+        button.hidden {
+            display: none;
+        }
+    </style>
 </head>
 <body>
-	<h1>Welcome to the Placeholder Index Page</h1>
-	<p>This is a basic placeholder for your index.html file.</p>
+    <div class="container">
+        <h1>Gundam alert system</h1>
+        <button id="start-btn" type="button" onclick="init()">Start</button>
+
+        <div id="webcam-container"></div>
+
+        <div id="alert-box">
+             GUNDAM DETECTED! PREPARE DEFENSES
+        </div>
+
+        <div id="label-container"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+    <script type="text/javascript">
+        const URL = "https://teachablemachine.withgoogle.com/models/ANryUhTMf/";
+
+        let model, webcam, labelContainer, maxPredictions;
+
+        async function init() {
+            const modelURL = URL + "model.json";
+            const metadataURL = URL + "metadata.json";
+
+            model = await tmImage.load(modelURL, metadataURL);
+            maxPredictions = model.getTotalClasses();
+
+            const flip = true;
+            webcam = new tmImage.Webcam(400, 400, flip);
+            await webcam.setup();
+            await webcam.play();
+            window.requestAnimationFrame(loop);
+
+            document.getElementById("start-btn").classList.add("hidden");
+            document.getElementById("webcam-container").appendChild(webcam.canvas);
+            labelContainer = document.getElementById("label-container");
+            for (let i = 0; i < maxPredictions; i++) {
+                const div = document.createElement("div");
+                div.className = "label-item";
+                labelContainer.appendChild(div);
+            }
+        }
+
+        async function loop() {
+            webcam.update();
+            await predict();
+            window.requestAnimationFrame(loop);
+        }
+
+        async function predict() {
+            const prediction = await model.predict(webcam.canvas);
+            let gundamConfidence = 0;
+
+            for (let i = 0; i < maxPredictions; i++) {
+                const classPrediction = prediction[i];
+                const confidence = classPrediction.probability.toFixed(2);
+                const className = classPrediction.className;
+
+                const element = labelContainer.childNodes[i];
+                element.innerHTML = `<strong>${className}:</strong> ${confidence}`;
+                element.className = "label-item " + (className === "Gundam" ? "gundam" : "not-gundam");
+
+                if (className === "Gundam") {
+                    gundamConfidence = confidence;
+                }
+            }
+
+            const canvas = webcam.canvas;
+            const alertBox = document.getElementById("alert-box");
+
+            if (gundamConfidence > 0.85) {
+                canvas.classList.add("gundam-detected");
+                alertBox.classList.add("show");
+            } else {
+                canvas.classList.remove("gundam-detected");
+                alertBox.classList.remove("show");
+            }
+        }
+    </script>
 </body>
 </html>
